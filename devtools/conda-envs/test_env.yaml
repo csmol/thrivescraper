@@ -18,6 +18,16 @@ dependencies:
   - pytest
   - pytest-cov
 
+  # Documentation
+  - pydata-sphinx-theme
+  - sphinx-design
+
+  # Pip-only installs
+  - pip:
+    # Documentation
+    - sphinx-copybutton
+    - sphinxnotes-strike
+
   # Pip-only installs
   #- pip:
   #  - codecov

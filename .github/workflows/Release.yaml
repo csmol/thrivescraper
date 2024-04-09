@@ -38,6 +38,10 @@ jobs:
       run: |
         black --check --diff thrivescraper
         flake8 thrivescraper
+    - name: Documentation Dependencies
+      shell: bash
+      run: |
+        python -m pip install -U Sphinx sphinx-rtd-theme
     - name: Documentation
       shell: bash -l {0}
       run: |
