@@ -5,9 +5,9 @@ Unit and regression test for the thrivescraper package.
 # Import package, test suite, and other packages as needed
 import sys
 
-import pytest
+import pytest  # noqa: F401
 
-import thrivescraper
+import thrivescraper  # noqa: F401
 
 
 def test_thrivescraper_imported():
