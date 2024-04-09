@@ -1,0 +1,37 @@
+thrivescraper package
+=====================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   thrivescraper.tests
+
+Submodules
+----------
+
+thrivescraper.github module
+---------------------------
+
+.. automodule:: thrivescraper.github
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+thrivescraper.thrivescraper module
+----------------------------------
+
+.. automodule:: thrivescraper.thrivescraper
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: thrivescraper
+   :members:
+   :undoc-members:
+   :show-inheritance:
