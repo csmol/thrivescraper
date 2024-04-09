@@ -92,8 +92,8 @@ jobs:
       shell: bash -l {0}
       run: |
         pytest -v --cov=thrivescraper --cov-report=xml --color=yes thrivescraper/tests/
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: CodeCov
       uses: codecov/codecov-action@v4
       with:
