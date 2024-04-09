@@ -8,17 +8,21 @@ build-backend = "setuptools.build_meta"
 name = "thrivescraper"
 description = "A web scraper for the THRIVE project"
 dynamic = ["version"]
-readme = "README.md"
+readme = "README.rst"
 authors = [
     { name = "Paul Saxe", email = "psaxe@vt.edu" }
 ]
 license = { text = "BSD-3-Clause" }
 # See https://pypi.org/classifiers/
 classifiers = [
+    "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Topic :: Software Development
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 # Declare any run-time dependencies that should be installed with the package.
 dependencies = [
     "beautifulsoup4",
@@ -27,8 +31,8 @@ dependencies = [
 ]
 
 # Update the urls once the hosting is set up.
-#[project.urls]
-#"Source" = "https://github.com/<username>/thrivescraper/"
+[project.urls]
+"Source" = "https://github.com/csmol/thrivescraper/"
 #"Documentation" = "https://thrivescraper.readthedocs.io/"
 
 [project.optional-dependencies]
@@ -38,7 +42,7 @@ test = [
 ]
 
 [project.scripts]
-thrivescraper = "thrivescraper:run"
+thrive = "thrivescraper:run"
 
 [tool.setuptools]
 # This subkey is a beta stage development and keys may change in the future, see https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html for more details

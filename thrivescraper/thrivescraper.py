@@ -1,35 +1,103 @@
 """Provide the primary functions."""
 
+import argparse
 import csv
 import json  # noqa: F401
+import logging
 from pathlib import Path  # noqa: F401
 import pprint  # noqa: F401
+import sys
 
 import thrivescraper
 
+logger = logging.getLogger("THRIVE")
+options = {}
+
+default_topics = (
+    "materials",
+    "materials-science",
+    "materials-informatics",
+    "computational-materials-science",
+    "materials-design",
+    "materials-discovery",
+    "materials-genome",
+    "materials-platform",
+    "computational-materials",
+    "materials-modeling",
+    "computational-materials-engineering",
+    "materials-simulation",
+    "optimade",
+    "ab-initio",
+    "quantum-chemistry",
+    "computational-chemistry",
+)
+
 
 def run():
-    # result = thrivescraper.scrape_topic("computational-materials-science")
+    # Create the argument parser and set the debug level ASAP
+    global options
 
-    topics = (
-        "materials",
-        "materials-science",
-        "materials-informatics",
-        "computational-materials-science",
-        "materials-design",
-        "materials-discovery",
-        "materials-genome",
-        "materials-platform",
-        "computational-materials",
-        "materials-modeling",
-        "computational-materials-engineering",
-        "materials-simulation",
-        "optimade",
-        "ab-initio",
-        "quantum-chemistry",
-        "computational-chemistry",
+    parser = argparse.ArgumentParser(
+        epilog="If no positional argument is given, the GUI will appear."
     )
-    # topics = ("computational-materials-engineering",)
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"THRIVE version {thrivescraper.__version__}",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="WARNING",
+        type=str.upper,
+        choices=["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help=("The level of informational output, defaults to " "'%(default)s'"),
+    )
+
+    # Parse the first options
+    if "-h" not in sys.argv and "--help" not in sys.argv:
+        options, _ = parser.parse_known_args()
+        kwargs = vars(options)
+
+        # Set up the logging
+        level = kwargs.pop("log_level", "WARNING")
+        logging.basicConfig(level=level)
+
+    # Now set up the rest of the parser
+    subparser = parser.add_subparsers()
+
+    setup_topic_handler(subparser)
+
+    # Parse the command-line arguments and call the requested function or the GUI
+    options = parser.parse_args()
+
+    if "func" in options:
+        try:
+            sys.exit(options.func())
+        except AttributeError:
+            print(f"Missing arguments to THRIVE {' '.join(sys.argv[1:])}")
+            # Append help so help will be printed
+            sys.argv.append("--help")
+            # re-run
+            run()
+
+
+def setup_topic_handler(subparser):
+    """Setup the parser for getting the repos in topics."""
+    parser = subparser.add_parser("mine-topics")
+    parser.set_defaults(func=topic_handler)
+    parser.add_argument(
+        "topics",
+        nargs="*",
+        default=default_topics,
+        help="The topics for gathering repos.",
+    )
+
+
+def topic_handler():
+    global options
+
+    topics = options.topics
 
     repos = {}
     topic_set = set()
