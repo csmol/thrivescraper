@@ -3,16 +3,21 @@ channels:
 
   - defaults
 dependencies:
-    # Base depends
+  # Base depends
   - python
   - pip
 
-    # Testing
+  - pygithub
+  - requests
+
+  # Testing
+  - black
+  - codecov
+  - flake8
   - pytest
   - pytest-cov
-  - codecov
 
-    # Pip-only installs
+  # Pip-only installs
   #- pip:
   #  - codecov
 

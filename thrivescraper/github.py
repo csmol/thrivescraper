@@ -1,9 +1,10 @@
 import configparser
 import json  # noqa: F401
+import os
 from pathlib import Path
 import pprint  # noqa: F401
-import requests
 
+import requests
 from bs4 import BeautifulSoup
 from github import Auth, Github
 
@@ -119,9 +120,18 @@ def use_api(topic):
     global gh
 
     if gh is None:
-        config = configparser.ConfigParser()
-        config.read(Path("~/.thriverc").expanduser())
-        token = config.get("GitHub", "token")
+        path = Path("~/.thriverc").expanduser()
+        if "GH_TOKEN" in os.environ:
+            token = os.environ["GH_TOKEN"]
+        elif path.exists():
+            config = configparser.ConfigParser()
+            config.read(path)
+            token = config.get("GitHub", "token")
+        else:
+            raise RuntimeError(
+                "A GitHUb token needs to be supplied in the environment variable "
+                "'GH_TOKEN' or in the file '~/.thriverc'."
+            )
         auth = Auth.Token(token)
         gh = Github(auth=auth)
 
