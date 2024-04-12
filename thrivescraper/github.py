@@ -1,12 +1,16 @@
 import configparser
 import json  # noqa: F401
+import logging
 import os
 from pathlib import Path
 import pprint  # noqa: F401
+import time
 
 import requests
 from bs4 import BeautifulSoup
 from github import Auth, Github
+
+logger = logging.getLogger(__name__)
 
 api_url = "https://api.github.com"
 github_url = "https://github.com"
@@ -175,3 +179,53 @@ def use_api(topic):
             print("")
             raise
     return result
+
+
+class GitHub(object):
+    """A class for interacting with GitHub via its API."""
+
+    def __init__(self, logger=logger):
+        self._gh = None
+
+    @property
+    def gh(self):
+        """The GitHub API object."""
+        if self._gh is None:
+            path = Path("~/.thriverc").expanduser()
+            if "GH_TOKEN" in os.environ:
+                token = os.environ["GH_TOKEN"]
+            elif path.exists():
+                config = configparser.ConfigParser()
+                config.read(path)
+                token = config.get("GitHub", "token")
+            else:
+                raise RuntimeError(
+                    "A GitHUb token needs to be supplied in the environment variable "
+                    "'GH_TOKEN' or in the file '~/.thriverc'."
+                )
+            auth = Auth.Token(token)
+            self._gh = Github(auth=auth)
+
+        return self._gh
+
+    def search_repositories(self, query):
+        result = {}
+
+        # Check whether we are rate limited
+        calls_left = self.gh.rate_limiting[0]
+        if calls_left <= 0:
+            reset_time = self.gh.rate_limiting_resettime - time.time()
+            if reset_time > 0:
+                self.logger.warning(f"Rate limited, waiting for {reset_time:.1f} s")
+                time.sleep(reset_time + 0.1)
+
+        repos = self.gh.search_repositories(query=query)
+
+        for repo in repos:
+            data = repo._rawData
+            fullname = data["full_name"]
+            result[fullname] = data
+
+            organization, name = fullname.split("/")
+            data["organization"] = organization
+        return result

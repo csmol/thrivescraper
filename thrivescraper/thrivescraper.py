@@ -1,145 +1,167 @@
 """Provide the primary functions."""
 
-import argparse
-import csv
-import json  # noqa: F401
 import logging
-from pathlib import Path  # noqa: F401
-import pprint  # noqa: F401
-import sys
+import pprint
 
-import thrivescraper
+from .github import GitHub
+from .thrive_db import ThriveDB
+from .util import iso_to_timestamp
 
-logger = logging.getLogger("THRIVE")
-options = {}
-
-default_topics = (
-    "materials",
-    "materials-science",
-    "materials-informatics",
-    "computational-materials-science",
-    "materials-design",
-    "materials-discovery",
-    "materials-genome",
-    "materials-platform",
-    "computational-materials",
-    "materials-modeling",
-    "computational-materials-engineering",
-    "materials-simulation",
-    "optimade",
-    "ab-initio",
-    "quantum-chemistry",
-    "computational-chemistry",
-)
+logger = logging.getLogger(__name__)
 
 
-def run():
-    # Create the argument parser and set the debug level ASAP
-    global options
+class ThriveScraper(object):
+    """Class for scraping GitHub and other sites for data."""
 
-    parser = argparse.ArgumentParser(
-        epilog="If no positional argument is given, the GUI will appear."
+    default_topics = (
+        "materials",
+        "materials-science",
+        "materials-informatics",
+        "computational-materials-science",
+        "materials-design",
+        "materials-discovery",
+        "materials-genome",
+        "materials-platform",
+        "computational-materials",
+        "materials-modeling",
+        "computational-materials-engineering",
+        "materials-simulation",
+        "optimade",
+        "ab-initio",
+        "quantum-chemistry",
+        "computational-chemistry",
     )
 
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"THRIVE version {thrivescraper.__version__}",
-    )
-    parser.add_argument(
-        "--log-level",
-        default="WARNING",
-        type=str.upper,
-        choices=["NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help=("The level of informational output, defaults to " "'%(default)s'"),
-    )
+    def __init__(self, options, logger=logger, gh=None, db=None):
+        self.logger = logger
+        self._db = db
+        self._gh = gh
+        self._options = vars(options)
 
-    # Parse the first options
-    if "-h" not in sys.argv and "--help" not in sys.argv:
-        options, _ = parser.parse_known_args()
-        kwargs = vars(options)
+    @classmethod
+    def mine_topics_helper(cls, options, gh=None, db=None):
+        """Thin wrapper for mining topics."""
+        scraper = cls(options, gh=gh, db=db)
+        scraper.mine_topics()
+        return 0
 
-        # Set up the logging
-        level = kwargs.pop("log_level", "WARNING")
-        logging.basicConfig(level=level)
+    @classmethod
+    def setup_parser(cls, subparser):
+        """Setup the parser for getting the repos in topics."""
+        parser = subparser.add_parser("mine-topics")
+        parser.set_defaults(func=cls.mine_topics_helper)
+        parser.add_argument(
+            "topics",
+            nargs="*",
+            default=cls.default_topics,
+            help="The topics for gathering repos.",
+        )
+        parser.add_argument(
+            "--repos-file",
+            help="The csv file for the repos info if not None.",
+        )
+        parser.add_argument(
+            "--topics-file",
+            help="The csv file for the topics if not None.",
+        )
 
-    # Now set up the rest of the parser
-    subparser = parser.add_subparsers()
+    @property
+    def db(self):
+        """The THRIVE database"""
+        if self._db is None:
+            self._db = ThriveDB(**self.options)
 
-    setup_topic_handler(subparser)
+        return self._db
 
-    # Parse the command-line arguments and call the requested function or the GUI
-    options = parser.parse_args()
+    @property
+    def gh(self):
+        """Our GitHub handler"""
+        if self._gh is None:
+            self._gh = GitHub()
 
-    if "func" in options:
-        try:
-            sys.exit(options.func())
-        except AttributeError:
-            print(f"Missing arguments to THRIVE {' '.join(sys.argv[1:])}")
-            # Append help so help will be printed
-            sys.argv.append("--help")
-            # re-run
-            run()
+        return self._gh
 
+    @property
+    def options(self):
+        """The options from the command line."""
+        return self._options
 
-def setup_topic_handler(subparser):
-    """Setup the parser for getting the repos in topics."""
-    parser = subparser.add_parser("mine-topics")
-    parser.set_defaults(func=topic_handler)
-    parser.add_argument(
-        "topics",
-        nargs="*",
-        default=default_topics,
-        help="The topics for gathering repos.",
-    )
+    def mine_topics(self):
+        topics = self.options["topics"]
 
+        table = self.db["repos"]
+        category_id = self.db.get_category_id("none")
+        total_added = 0
+        n_total = 0
+        for topic in topics:
+            n_added = 0
+            repo_data = self.gh.search_repositories(f"topic:{topic}")
+            n_total += len(repo_data)
+            for item in repo_data.values():
+                # remove unwanted keys
+                del item["owner"]
+                keys = [*item.keys()]
+                for key in keys:
+                    if "url" in key:
+                        del item[key]
 
-def topic_handler():
-    global options
+                self.logger.debug(pprint.pformat(item))
 
-    topics = options.topics
+                # Insert into the database as needed
+                full_name = item["full_name"]
 
-    repos = {}
-    topic_set = set()
-    for topic in topics:
-        result = thrivescraper.use_api(topic)
+                if not self.db.repo_exists(full_name):
+                    n_added += 1
 
-        for item in result.values():
-            topic_set.update(item["topics"])
-            item["topics"] = " ".join(item["topics"])
-        len1 = len(repos)
-        len2 = len(result)
-        repos.update(**result)
-        len3 = len(repos)
-        print(f"{topic:40s} {len2} repos of which {len3-len1} are new.")
+                    if item["license"] is None:
+                        license = None
+                    else:
+                        license = item["license"]["name"]
 
-    to_csv(repos, "test.csv")
+                    organization = item["organization"]
+                    if not self.db.organization_exists(organization):
+                        self.db["organizations"].append(name=organization)
+                    organization_id = self.db.get_organization_id(organization)
 
-    all_topics = sorted(topic_set)
-    with open("topics.csv", "w", newline="") as fd:
-        writer = csv.writer(fd)
-        writer.writerow(["Topic"])
-        for top in all_topics:
-            writer.writerow([top])
-    print(f"{len(all_topics)} topics were written to topics.csv")
+                    table.append(
+                        active=0,
+                        category=category_id,
+                        full_name=full_name,
+                        organization=organization_id,
+                        name=item["name"],
+                        created_at=iso_to_timestamp(item["created_at"]),
+                        default_branch=item["default_branch"],
+                        description=item["description"],
+                        homepage=item["homepage"],
+                        language=item["language"],
+                        license=license,
+                        node_id=item["node_id"],
+                        pushed_at=iso_to_timestamp(item["pushed_at"]),
+                        updated_at=iso_to_timestamp(item["updated_at"]),
+                    )
 
+                # And insert/update the topics
+                repo_id = self.db.get_repo_id(full_name)
+                previous = self.db.get_repo_topics(repo_id)
+                for _topic in item["topics"]:
+                    if _topic not in previous:
+                        if self.db.topic_exists(_topic):
+                            topic_id = self.db.get_topic_id(_topic)
+                        else:
+                            topic_id = self.db["topics"].append(name=_topic)
+                        self.db["repos_topics"].append(repo=repo_id, topic=topic_id)
 
-def to_csv(data, path):
-    """Write the dictionary as CSV to the path"""
+            print(
+                f"Found {n_added} new repos out of {len(repo_data)} for topic {topic}."
+            )
+            total_added += n_added
 
-    fieldnames = [key for key in next(iter(data.values())).keys()]
+        print(f"Found {total_added} new repos out of the total of {n_total}.")
 
-    row = 0
-    with open(path, "w", newline="") as fd:
-        writer = csv.DictWriter(fd, fieldnames)
-        writer.writeheader()
-        for item in data.values():
-            row += 1
-            item["row"] = row
-            writer.writerow(item)
-    print(f"Wrote {row} rows to CSV file {path}")
-
-
-if __name__ == "__main__":
-    # Do something if this file is invoked on its own
-    run()
+        if False:
+            print()
+            print("Repos")
+            print(table)
+            print()
+            print("Topics")
+            print(self.db["topics"])

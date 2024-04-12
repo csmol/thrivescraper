@@ -26,6 +26,7 @@ requires-python = ">=3.11"
 # Declare any run-time dependencies that should be installed with the package.
 dependencies = [
     "beautifulsoup4",
+    "pandas",
     "pygithub",
     "requests",
 ]
@@ -42,7 +43,7 @@ test = [
 ]
 
 [project.scripts]
-thrive = "thrivescraper:run"
+thrive = "thrivescraper:main"
 
 [tool.setuptools]
 # This subkey is a beta stage development and keys may change in the future, see https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html for more details
